@@ -416,13 +416,30 @@
         // Generate QR Code
         document.addEventListener('DOMContentLoaded', function() {
             // Generate QR Code using qrcode-generator library
-            const qr = qrcode(4, 'H'); // type 4, error correction level H
-            qr.addData('{{ $shortUrl }}');
-            qr.make();
-            document.getElementById('qrcode').innerHTML = qr.createImgTag(2, 4);
+            try {
+                console.log('Generating QR code...');
+                const url = '{{ $shortUrl }}';
+                console.log('URL length:', url.length);
+                
+                // Use type 6 with low error correction for longer URLs
+                const qr = qrcode(6, 'L');
+                qr.addData(url);
+                qr.make();
+                document.getElementById('qrcode').innerHTML = qr.createImgTag(2, 4);
+                console.log('QR code generated successfully');
+            } catch (error) {
+                console.error('QR code error:', error);
+                const qrContainer = document.getElementById('qrcode');
+                if (qrContainer) {
+                    qrContainer.innerHTML = '<div class="text-center text-muted p-3"><i class="bi bi-exclamation-triangle"></i><br><small>QR generation failed</small></div>';
+                }
+            }
 
-            // Load initial analytics
-            loadAnalytics(7);
+            // Load initial analytics with delay to ensure Chart.js is loaded
+            setTimeout(() => {
+                console.log('DOM ready, loading analytics...');
+                loadAnalytics(7);
+            }, 100);
 
             // Period button handlers
             document.querySelectorAll('[data-period]').forEach(btn => {
@@ -481,22 +498,68 @@
         }
 
         function loadAnalytics(days) {
+            console.log('Loading analytics for', days, 'days');
             const container = document.getElementById('analyticsContainer');
+            
+            if (!container) {
+                console.error('Analytics container not found');
+                return;
+            }
+            
             container.innerHTML = '<div class="text-center py-5"><i class="bi bi-hourglass-split" style="font-size: 2rem;"></i><p class="mt-2">Loading analytics...</p></div>';
 
-            fetch(`{{ route('shortlinks.analytics-data', $shortlink) }}?days=${days}`)
-                .then(response => response.json())
+            const url = `{{ route('shortlinks.analytics-data', $shortlink) }}?days=${days}`;
+            console.log('Fetching analytics from:', url);
+
+            fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            })
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Analytics data received:', data);
+                    if (typeof Chart === 'undefined') {
+                        throw new Error('Chart.js is not loaded');
+                    }
                     renderAnalytics(data);
                 })
                 .catch(error => {
                     console.error('Error loading analytics:', error);
-                    container.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i><p class="mt-2">Failed to load analytics</p></div>';
+                    container.innerHTML = `
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+                            <p class="mt-2">Failed to load analytics</p>
+                            <small class="text-muted">Error: ${error.message}</small>
+                        </div>
+                    `;
                 });
         }
 
         function renderAnalytics(data) {
+            console.log('Rendering analytics with data:', data);
             const container = document.getElementById('analyticsContainer');
+            
+            if (!container) {
+                console.error('Analytics container not found in renderAnalytics');
+                return;
+            }
+            
+            if (!data) {
+                console.error('No data provided to renderAnalytics');
+                container.innerHTML = '<div class="text-center py-5 text-muted"><p>No analytics data available</p></div>';
+                return;
+            }
             
             container.innerHTML = `
                 <div class="row mb-4">
@@ -518,110 +581,132 @@
             `;
 
             // Clicks over time chart
-            new Chart(document.getElementById('clicksChart'), {
-                type: 'line',
-                data: {
-                    labels: data.dates,
-                    datasets: [{
-                        label: 'Clicks',
-                        data: data.clicks,
-                        borderColor: '#0d6efd',
-                        backgroundColor: '#0d6efd20',
-                        tension: 0.3,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Clicks Over Time'
-                        }
+            try {
+                console.log('Creating clicks chart...');
+                new Chart(document.getElementById('clicksChart'), {
+                    type: 'line',
+                    data: {
+                        labels: data.dates,
+                        datasets: [{
+                            label: 'Clicks',
+                            data: data.clicks,
+                            borderColor: '#0d6efd',
+                            backgroundColor: '#0d6efd20',
+                            tension: 0.3,
+                            fill: true
+                        }]
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Clicks Over Time'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error('Error creating clicks chart:', error);
+            }
 
             // Top locations chart
-            new Chart(document.getElementById('locationsChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: data.locations.map(l => l.country),
-                    datasets: [{
-                        data: data.locations.map(l => l.count),
-                        backgroundColor: ['#0d6efd', '#6c757d', '#198754', '#fd7e14', '#dc3545']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Top Locations'
+            try {
+                console.log('Creating locations chart...');
+                new Chart(document.getElementById('locationsChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.locations.map(l => l.country),
+                        datasets: [{
+                            data: data.locations.map(l => l.count),
+                            backgroundColor: ['#0d6efd', '#6c757d', '#198754', '#fd7e14', '#dc3545']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Top Locations'
+                            }
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error('Error creating locations chart:', error);
+            }
 
             // Device types chart
-            new Chart(document.getElementById('devicesChart'), {
-                type: 'bar',
-                data: {
-                    labels: data.devices.map(d => d.device_type),
-                    datasets: [{
-                        label: 'Clicks',
-                        data: data.devices.map(d => d.count),
-                        backgroundColor: '#198754'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Device Types'
-                        }
+            try {
+                console.log('Creating devices chart...');
+                new Chart(document.getElementById('devicesChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: data.devices.map(d => d.device_type),
+                        datasets: [{
+                            label: 'Clicks',
+                            data: data.devices.map(d => d.count),
+                            backgroundColor: '#198754'
+                        }]
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Device Types'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error('Error creating devices chart:', error);
+            }
 
             // Top referrers chart
-            new Chart(document.getElementById('referrersChart'), {
-                type: 'bar',
-                indexAxis: 'y',
-                data: {
-                    labels: data.referrers.map(r => r.referrer || 'Direct'),
-                    datasets: [{
-                        label: 'Clicks',
-                        data: data.referrers.map(r => r.count),
-                        backgroundColor: '#fd7e14'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Top Referrers'
-                        }
+            try {
+                console.log('Creating referrers chart...');
+                new Chart(document.getElementById('referrersChart'), {
+                    type: 'bar',
+                    indexAxis: 'y',
+                    data: {
+                        labels: data.referrers.map(r => r.referrer || 'Direct'),
+                        datasets: [{
+                            label: 'Clicks',
+                            data: data.referrers.map(r => r.count),
+                            backgroundColor: '#fd7e14'
+                        }]
                     },
-                    scales: {
-                        x: {
-                            beginAtZero: true
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Top Referrers'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true
+                            }
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error('Error creating referrers chart:', error);
+            }
+            
+            console.log('All charts created successfully!');
         }
 
         function confirmDelete() {

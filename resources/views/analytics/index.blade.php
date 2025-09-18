@@ -62,7 +62,7 @@
         <div class="col-md-2">
             <x-stats-card 
                 title="Total Clicks" 
-                :value="number_format($stats['total_clicks'])"
+                :value="number_format((int)$stats['total_clicks'])"
                 icon="cursor-fill"
                 color="primary"
             />
@@ -70,7 +70,7 @@
         <div class="col-md-2">
             <x-stats-card 
                 title="Unique Visitors" 
-                :value="number_format($stats['unique_visitors'])"
+                :value="number_format((int)$stats['unique_visitors'])"
                 icon="people"
                 color="success"
             />
@@ -78,7 +78,7 @@
         <div class="col-md-2">
             <x-stats-card 
                 title="Active Shortlinks" 
-                :value="number_format($stats['total_shortlinks'])"
+                :value="number_format((int)$stats['total_shortlinks'])"
                 icon="link"
                 color="info"
             />
@@ -86,7 +86,7 @@
         <div class="col-md-2">
             <x-stats-card 
                 title="Active Domains" 
-                :value="number_format($stats['active_domains'])"
+                :value="number_format((int)$stats['active_domains'])"
                 icon="globe"
                 color="warning"
             />
@@ -94,7 +94,7 @@
         <div class="col-md-2">
             <x-stats-card 
                 title="Avg Clicks/Link" 
-                :value="$stats['avg_clicks_per_link']"
+                :value="number_format($stats['avg_clicks_per_link'], 1)"
                 icon="graph-up"
                 color="secondary"
             />
@@ -172,7 +172,7 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <span class="badge bg-success">{{ number_format($shortlink->clicks_count) }}</span>
+                                                <span class="badge bg-success">{{ number_format((int)$shortlink->clicks_count) }}</span>
                                             </td>
                                             <td>
                                                 <div class="btn-group btn-group-sm">
@@ -235,15 +235,15 @@
                 </div>
                 <div class="card-body">
                     @if(!empty($geoData['cities']))
-                        <canvas id="geoChart" height="200"></canvas>
+                        <canvas id="geoChart" style="max-height: 200px; height: 200px;"></canvas>
                         <div class="mt-3">
                             @foreach(array_slice($geoData['cities'], 0, 5) as $geo)
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <div>
                                         <i class="bi bi-flag me-1"></i>{{ $geo['country'] }}
-                                        <small class="text-muted">({{ number_format($geo['city']) }} unique)</small>
+                                        <small class="text-muted">{{ $geo['city'] }}</small>
                                     </div>
-                                    <span class="badge bg-primary">{{ number_format($geo['click_count']) }}</span>
+                                    <span class="badge bg-primary">{{ number_format((int)$geo['click_count']) }}</span>
                                 </div>
                             @endforeach
                         </div>
@@ -273,7 +273,7 @@
                                         <i class="bi bi-{{ $device['device_type'] === 'Mobile' ? 'phone' : ($device['device_type'] === 'Tablet' ? 'tablet' : 'laptop') }} me-1"></i>
                                         {{ $device['device_type'] }}
                                     </div>
-                                    <span class="badge bg-info">{{ number_format($device['count']) }}</span>
+                                    <span class="badge bg-info">{{ number_format((int)$device['count']) }}</span>
                                 </div>
                             @endforeach
                         </div>
@@ -303,7 +303,7 @@
                                         <div class="progress-bar bg-success" style="width: {{ ($referrer['click_count'] / $referrerData['top_referrers'][0]['click_count']) * 100 }}%"></div>
                                     </div>
                                 </div>
-                                <span class="badge bg-success ms-2">{{ number_format($referrer['click_count']) }}</span>
+                                <span class="badge bg-success ms-2">{{ number_format((int)$referrer['click_count']) }}</span>
                             </div>
                         @endforeach
                     @else
@@ -464,9 +464,9 @@
             geoChart = new Chart(geoCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: @json($geoData->take(5)->pluck('country')),
+                    labels: @json(collect($geoData['cities'])->take(5)->pluck('country')),
                     datasets: [{
-                        data: @json($geoData->take(5)->pluck('clicks')),
+                        data: @json(collect($geoData['cities'])->take(5)->pluck('click_count')),
                         backgroundColor: [
                             '#0d6efd', '#6c757d', '#198754', '#fd7e14', '#dc3545'
                         ]
@@ -474,7 +474,8 @@
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
+                    maintainAspectRatio: true,
+                    aspectRatio: 1,
                     plugins: {
                         legend: {
                             display: false

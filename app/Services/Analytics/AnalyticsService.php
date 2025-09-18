@@ -526,20 +526,16 @@ class AnalyticsService extends BaseService
     }
 
 
-    /**
-     * Get average clicks per link
-     */
-    private function getAvgClicksPerLink(array $filters = []): string
+    private function getAvgClicksPerLink(array $filters = []): float
     {
         $totalClicks = $this->getTotalClicks($filters);
         $totalShortlinks = $this->getTotalShortlinks($filters);
         
         if ($totalShortlinks === 0) {
-            return '0';
+            return 0.0;
         }
         
-        $average = $totalClicks / $totalShortlinks;
-        return number_format($average, 1);
+        return round($totalClicks / $totalShortlinks, 1);
     }
 
     /**

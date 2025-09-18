@@ -268,18 +268,51 @@ class RedirectController extends Controller
     private function trackClick(Request $request, $shortlink)
     {
         try {
+            // Initialize agent for device/browser detection
+            $agent = new \Jenssegers\Agent\Agent();
+            $agent->setUserAgent($request->userAgent());
+            
+            // Get location data
+            $locationData = $this->getLocationData($request->ip());
+            
             $clickData = [
                 'shortlink_id' => $shortlink->id,
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
                 'referer' => $request->header('referer'),
-                'country_code' => $this->getCountry($request->ip()),
+                'referrer_url' => $request->header('referer'),
+                
+                // Location data
+                'country_code' => $locationData['country_code'] ?? null,
+                'country' => $locationData['country'] ?? null,
+                'region' => $locationData['region'] ?? null,
+                'city' => $locationData['city'] ?? null,
+                'postal_code' => $locationData['postal_code'] ?? null,
+                'latitude' => $locationData['latitude'] ?? null,
+                'longitude' => $locationData['longitude'] ?? null,
+                'timezone' => $locationData['timezone'] ?? null,
+                
+                // Device/Browser data
+                'browser' => $agent->browser(),
+                'browser_version' => $agent->version($agent->browser()),
+                'operating_system' => $agent->platform(),
+                'operating_system_version' => $agent->version($agent->platform()),
+                'is_mobile' => $agent->isMobile() ? 1 : 0,
+                'is_tablet' => $agent->isTablet() ? 1 : 0,
+                'is_desktop' => $agent->isDesktop() ? 1 : 0,
+                'is_robot' => $agent->isRobot() ? 1 : 0,
+                
+                'clicked_at' => now(),
             ];
 
             $this->clickService->recordShortlinkClick($shortlink->id, $clickData);
         } catch (Exception $e) {
             // Log error but don't fail the redirect
-            logger()->error('Failed to track click', ['error' => $e->getMessage()]);
+            logger()->error('Failed to track click', [
+                'error' => $e->getMessage(),
+                'shortlink_id' => $shortlink->id ?? null,
+                'ip' => $request->ip()
+            ]);
         }
     }
 
@@ -320,12 +353,65 @@ class RedirectController extends Controller
     }
 
     /**
-     * Get country from IP (placeholder)
+     * Get location data from IP address
      */
-    private function getCountry(string $ip): ?string
+    private function getLocationData(string $ip): array
     {
-        // Implement IP geolocation logic
-        return null;
+        try {
+            // Skip local/private IPs
+            if ($this->isPrivateIP($ip)) {
+                return [
+                    'country_code' => null,
+                    'country' => 'Local',
+                    'region' => null,
+                    'city' => null,
+                    'postal_code' => null,
+                    'latitude' => null,
+                    'longitude' => null,
+                    'timezone' => null,
+                ];
+            }
+            
+            // Use stevebauman/location for IP geolocation
+            $location = \Location::get($ip);
+            
+            if ($location) {
+                return [
+                    'country_code' => $location->countryCode,
+                    'country' => $location->countryName,
+                    'region' => $location->regionName,
+                    'city' => $location->cityName,
+                    'postal_code' => $location->zipCode,
+                    'latitude' => $location->latitude,
+                    'longitude' => $location->longitude,
+                    'timezone' => $location->timezone,
+                ];
+            }
+        } catch (Exception $e) {
+            logger()->warning('Failed to get location data', [
+                'ip' => $ip,
+                'error' => $e->getMessage()
+            ]);
+        }
+        
+        return [
+            'country_code' => null,
+            'country' => null,
+            'region' => null,
+            'city' => null,
+            'postal_code' => null,
+            'latitude' => null,
+            'longitude' => null,
+            'timezone' => null,
+        ];
+    }
+
+    /**
+     * Check if IP address is private/local
+     */
+    private function isPrivateIP(string $ip): bool
+    {
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
     }
 
     /**
