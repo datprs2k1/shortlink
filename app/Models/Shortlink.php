@@ -69,12 +69,9 @@ class Shortlink extends Model
         $this->increment('click_count');
     }
 
-    /**
-     * Get the full short URL.
-     */
     public function getShortUrlAttribute()
     {
-        return $this->domain->name . '/' . $this->short_code;
+        return 'https://' . $this->domain->name . '/' . $this->short_code;
     }
 
     /**

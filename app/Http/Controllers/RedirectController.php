@@ -265,9 +265,6 @@ class RedirectController extends Controller
         }
     }
 
-    /**
-     * Track click for analytics
-     */
     private function trackClick(Request $request, $shortlink)
     {
         try {
@@ -276,14 +273,10 @@ class RedirectController extends Controller
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
                 'referer' => $request->header('referer'),
-                'country' => $this->getCountry($request->ip()),
-                'city' => $this->getCity($request->ip()),
-                'browser' => $this->getBrowser($request->userAgent()),
-                'operating_system' => $this->getOS($request->userAgent()),
-                'device_type' => $this->getDevice($request->userAgent()),
+                'country_code' => $this->getCountry($request->ip()),
             ];
 
-            $this->clickService->create($clickData);
+            $this->clickService->recordShortlinkClick($shortlink->id, $clickData);
         } catch (Exception $e) {
             // Log error but don't fail the redirect
             logger()->error('Failed to track click', ['error' => $e->getMessage()]);

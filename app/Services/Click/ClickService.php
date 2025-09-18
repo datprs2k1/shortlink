@@ -39,9 +39,6 @@ class ClickService extends BaseService
         return $this->mainRepository->create($clickData);
     }
 
-    /**
-     * Record click for shortlink
-     */
     public function recordShortlinkClick(int $shortlinkId, array $trackingData = []): Click
     {
         $clickData = array_merge($trackingData, [
@@ -49,7 +46,17 @@ class ClickService extends BaseService
             self::FIELD_CLICKED_AT => now(),
         ]);
 
-        return $this->recordClick($clickData);
+        // Use database transaction to ensure atomicity
+        return DB::transaction(function () use ($clickData, $shortlinkId) {
+            // Record the click
+            $click = $this->recordClick($clickData);
+            
+            // Increment the shortlink's click_count counter
+            // Using increment() for thread safety
+            \App\Models\Shortlink::where('id', $shortlinkId)->increment('click_count');
+            
+            return $click;
+        });
     }
 
     // ========================================
